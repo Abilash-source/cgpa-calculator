@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;color:#333}
+.wrap{padding:1.5rem}
+h1{font-size:22px;font-weight:500;margin-bottom:1rem}
+h3{font-size:16px;font-weight:500;margin-bottom:.75rem}
+.card{background:#fff;border:1px solid #ddd;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem}
+.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:.5rem}
+label{font-size:13px;color:#666;white-space:nowrap}
+input,select{height:34px;padding:0 8px;border:1px solid #ccc;border-radius:8px;font-size:14px;background:#fff;color:#333}
+select{width:auto;min-width:155px}
+input[type=number]{width:90px}
+table{width:100%;border-collapse:collapse;margin-top:.5rem}
+th,td{border:1px solid #ddd;padding:7px 10px;text-align:center;font-size:14px}
+th{background:#f5f5f5;font-weight:500}
+.btn{height:32px;padding:0 12px;border:1px solid #ccc;border-radius:8px;background:transparent;color:#333;cursor:pointer;font-size:13px}
+.btn:hover{background:#f5f5f5}
+.btn-sm{height:28px;padding:0 8px;font-size:12px}
+.btn-danger{color:#c00;border-color:#f5c0c0}
+.toolbar{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap}
+.gpa-info{font-size:13px;color:#666;margin-top:.5rem}
+.summary-total td{font-weight:500;background:#f5f5f5}
+.cgpa-big{font-size:28px;font-weight:500}
+.cgpa-label{font-size:13px;color:#666}
+.result-card{background:#f5f5f5;border-radius:8px;padding:1rem;margin-top:1rem;display:inline-block;min-width:140px}
+.divider{border:none;border-top:1px solid #eee;margin:1rem 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Smart CGPA calculator</h1>
+<div class="toolbar">
+  <button class="btn" onclick="addPrevious()">+ Add previous entry</button>
+  <button class="btn" onclick="addSemester()">+ Add current semester</button>
+  <button class="btn" onclick="recalculate()">Recalculate</button>
+</div>
+<div id="entries"></div>
+<hr class="divider">
+<h3>Final summary</h3>
+<div id="summary"></div>
+</div>
+
+<script>
+let data = [];
+
+function computeLabels() {
+  let counter = 1;
+  return data.map(e => {
+    let label;
+    if (e.kind === 'prev') {
+      if (e.type === 'cgpa') {
+        let upto = e.uptoSem || 0;
+        label = upto > 0 ? `Sem 1 – ${upto} (previous CGPA)` : `Previous CGPA`;
+        counter = upto + 1;
+      } else {
+        label = `Sem ${counter} (previous GPA)`;
+        counter += 1;
+      }
+    } else {
+      label = `Sem ${counter} (current)`;
+      counter += 1;
+    }
+    return label;
+  });
+}
+
+function addPrevious() {
+  data.push({ kind:'prev', type:'gpa', v:0, credits:0, uptoSem:0 });
+  render();
+}
+
+function addSemester() {
+  data.push({ kind:'sem', subjects:[], gpa:0, credits:0 });
+  render();
+}
+
+function removeEntry(i) {
+  data.splice(i, 1);
+  render();
+}
+
+function addSubject(i) {
+  data[i].subjects.push({ grade:0, credit:0 });
+  render();
+}
+
+function removeSubject(i, j) {
+  data[i].subjects.splice(j, 1);
+  render();
+}
+
+function setField(i, field, val) {
+  if (field === 'type') data[i][field] = val;
+  else data[i][field] = parseFloat(val) || 0;
+}
+
+function setSubject(i, j, field, val) {
+  data[i].subjects[j][field] = parseFloat(val) || 0;
+}
+
+function calcSem(i) {
+  let s=0, c=0;
+  data[i].subjects.forEach(sub => { s += sub.grade * sub.credit; c += sub.credit; });
+  data[i].gpa = c ? s/c : 0;
+  data[i].credits = c;
+}
+
+function recalculate() {
+  let totalC=0, totalW=0;
+  data.forEach((e, i) => {
+    if (e.kind === 'prev') {
+      if (e.type === 'cgpa') { totalC = e.credits; totalW = e.v * e.credits; }
+      else { totalC += e.credits; totalW += e.v * e.credits; }
+    } else {
+      calcSem(i);
+      totalC += e.credits; totalW += e.gpa * e.credits;
+    }
+  });
+  let cgpa = totalC ? totalW / totalC : 0;
+  render();
+  renderSummary(totalC, cgpa);
+}
+
+function render() {
+  let labels = computeLabels();
+  let c = document.getElementById('entries'); c.innerHTML = '';
+  data.forEach((e, i) => {
+    let div = document.createElement('div'); div.className = 'card';
+    if (e.kind === 'prev') {
+      div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+          <h3>${labels[i]}</h3>
+          <button class="btn btn-sm btn-danger" onclick="removeEntry(${i})">Remove</button>
+        </div>
+        <div class="row">
+          <label>Type</label>
+          <select onchange="setField(${i},'type',this.value);render()">
+            <option value="gpa" ${e.type==='gpa'?'selected':''}>GPA (single semester)</option>
+            <option value="cgpa" ${e.type==='cgpa'?'selected':''}>CGPA (cumulative)</option>
+          </select>
+          ${e.type==='cgpa' ? `<label>Up to sem</label><input type="number" value="${e.uptoSem}" onchange="setField(${i},'uptoSem',this.value);render()" min="1">` : ''}
+          <label>${e.type==='cgpa'?'CGPA':'GPA'}</label>
+          <input type="number" value="${e.v}" step="0.01" onchange="setField(${i},'v',this.value)" min="0" max="10">
+          <label>Credits</label>
+          <input type="number" value="${e.credits}" onchange="setField(${i},'credits',this.value)" min="0">
+        </div>`;
+    } else {
+      let rows = '';
+      e.subjects.forEach((s, j) => {
+        rows += `<tr>
+          <td>S${j+1}</td>
+          <td><input type="number" value="${s.grade}" step="0.01" style="width:80px" onchange="setSubject(${i},${j},'grade',this.value)" min="0" max="10"></td>
+          <td><input type="number" value="${s.credit}" style="width:80px" onchange="setSubject(${i},${j},'credit',this.value)" min="0"></td>
+          <td><button class="btn btn-sm btn-danger" onclick="removeSubject(${i},${j});render()">Remove</button></td>
+        </tr>`;
+      });
+      div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+          <h3>${labels[i]}</h3>
+          <button class="btn btn-sm btn-danger" onclick="removeEntry(${i})">Remove</button>
+        </div>
+        <table>
+          <tr><th>Subject</th><th>Grade</th><th>Credits</th><th></th></tr>
+          ${rows}
+        </table>
+        <div style="margin-top:.5rem">
+          <button class="btn btn-sm" onclick="addSubject(${i});render()">+ Add subject</button>
+        </div>
+        <p class="gpa-info" style="margin-top:.5rem">GPA: ${e.gpa ? e.gpa.toFixed(2) : '—'} &nbsp;|&nbsp; Credits: ${e.credits||0}</p>`;
+    }
+    c.appendChild(div);
+  });
+}
+
+function renderSummary(totalC, cgpa) {
+  let labels = computeLabels();
+  let rows = '';
+  data.forEach((e, i) => {
+    if (e.kind === 'prev') {
+      rows += `<tr><td>${labels[i]}</td><td>${e.credits}</td><td>${parseFloat(e.v).toFixed(2)}</td></tr>`;
+    } else {
+      rows += `<tr><td>${labels[i]}</td><td>${e.credits||0}</td><td>${e.gpa ? e.gpa.toFixed(2) : '—'}</td></tr>`;
+    }
+  });
+  document.getElementById('summary').innerHTML = `
+    <table>
+      <tr><th>Entry</th><th>Credits</th><th>Value</th></tr>
+      ${rows}
+      <tr class="summary-total"><td>Total</td><td>${totalC}</td><td>${cgpa.toFixed(2)}</td></tr>
+    </table>
+    <div class="result-card">
+      <div class="cgpa-label">Overall CGPA</div>
+      <div class="cgpa-big">${cgpa.toFixed(2)}</div>
+    </div>`;
+}
+
+addPrevious();
+addSemester();
+</script>
+</body>
+</html>
