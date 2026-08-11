@@ -11,5 +11,5 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Show project files
-        run: ls -la
+      - name: Check index.html
+        run: test -f index.html
