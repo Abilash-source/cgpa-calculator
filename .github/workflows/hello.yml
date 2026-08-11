@@ -1,18 +1,22 @@
-name: CGPA Calculator CI
+name: CGPA Calculator CD Test
 
 on:
   push:
 
 jobs:
-  test:
+  deploy-test:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Check index.html exists
-        run: test -f index.html
-
-      - name: Check index.html is not empty
-        run: test -s index.html
+      - name: Test SSH connection
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            whoami
+            pwd
