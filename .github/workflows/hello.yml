@@ -8,5 +8,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Say Hello
-        run: echo "I am learning CI/CD!"
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Show project files
+        run: ls -la
